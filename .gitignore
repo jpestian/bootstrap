@@ -1,0 +1,21 @@
+# datasets and artifacts
+datasets/
+artifacts/
+tmp/
+
+# ML / research files
+*.parquet
+*.npy
+*.pt
+*.ckpt
+*.model
+
+# python
+__pycache__/
+*.pyc
+
+# notebooks
+.ipynb_checkpoints/
+
+# system files
+.DS_Store
