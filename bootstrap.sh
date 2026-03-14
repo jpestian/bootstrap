@@ -148,19 +148,21 @@ source "$HOME/miniconda3/etc/profile.d/conda.sh"
 echo
 echo "STEP 6 — Restore conda environment"
 
-if [ -f "$HOME/config/nlp_core_environment.yml" ]; then
+ENV_FILE="$HOME/projects/bootstrap/config/nlp_core_environment.yml"
+
+if [ -f "$ENV_FILE" ]; then
 
     if conda env list | grep -q "nlp-core"; then
         echo "Environment 'nlp-core' already exists"
     else
         echo "Creating NLP environment..."
-        conda env create -f "$HOME/config/nlp_core_environment.yml"
+        conda env create -f "$ENV_FILE"
     fi
 
     conda activate nlp-core
 
 else
-    echo "No conda environment file found in ~/config"
+    echo "No conda environment file found"
 fi
 
 #############################################
@@ -170,8 +172,10 @@ fi
 echo
 echo "STEP 7 — Install additional system packages"
 
-if [ -f "$HOME/config/installed_packages_apt.txt" ]; then
-    sudo apt install -y $(awk '{print $1}' "$HOME/config/installed_packages_apt.txt")
+APT_FILE="$HOME/projects/bootstrap/config/installed_packages_apt.txt"
+
+if [ -f "$APT_FILE" ]; then
+    sudo apt install -y $(awk '{print $1}' "$APT_FILE")
 else
     echo "No apt package list found"
 fi
@@ -219,24 +223,30 @@ fi
 echo
 echo "STEP 10 — Clone repositories"
 
+REPO_LIST="$HOME/projects/bootstrap/config/github_repos.txt"
+
 cd ~/projects
 
-REPOS=(
-"https://github.com/jpestian/nlp-core.git"
-)
+if [ -f "$REPO_LIST" ]; then
 
-for repo in "${REPOS[@]}"; do
+    while IFS= read -r repo || [ -n "$repo" ]; do
 
-    name=$(basename "$repo" .git)
+        [[ -z "$repo" || "$repo" =~ ^# ]] && continue
 
-    if [ ! -d "$HOME/projects/$name" ]; then
-        echo "Cloning $name ..."
-        git clone "$repo"
-    else
-        echo "$name already present"
-    fi
+        name=$(basename "$repo" .git)
 
-done
+        if [ ! -d "$HOME/projects/$name" ]; then
+            echo "Cloning $name ..."
+            git clone "$repo"
+        else
+            echo "$name already present"
+        fi
+
+    done < "$REPO_LIST"
+
+else
+    echo "No repository list found"
+fi
 
 #############################################
 # STEP 11 — Machine-specific configuration
