@@ -1,101 +1,111 @@
-cd ~/projects/bootstrap
+#!/usr/bin/env bash
+set -euo pipefail
 
-cat > bootstrap.sh << 'EOF'
-#!/bin/bash
+#############################################
+# CONFIG
+#############################################
 
-# =====================================================
-# Pestian Lab Bootstrap (PROJECT-CENTRIC ONLY)
-# =====================================================
+ENV_NAME="nlp-core"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$REPO_DIR/config/nlp-core.yml"
 
-set -e
+#############################################
+# HEADER
+#############################################
 
-PROJECT_ROOT="$(pwd)"
+echo
+echo "============================================="
+echo "Pestian Lab Bootstrap"
+echo "============================================="
+echo
+echo "Repo: $REPO_DIR"
+echo "Env file: $ENV_FILE"
+echo
 
-echo "----------------------------------------"
-echo "Initializing project at:"
-echo "$PROJECT_ROOT"
-echo "----------------------------------------"
+#############################################
+# STEP 1 — Load Conda properly
+#############################################
 
-# -----------------------------------------------------
-# SAFETY CHECK — must be inside ~/projects
-# -----------------------------------------------------
-if [[ "$PROJECT_ROOT" != *"/projects/"* ]]; then
-    echo "ERROR: Run this inside ~/projects/<project_name>"
+echo "STEP 1 — Initialize Conda"
+
+if command -v module >/dev/null 2>&1; then
+    module purge
+    module load miniconda3/24.1.2-py310
+fi
+
+# CRITICAL FIX: explicitly source conda.sh
+if [ -f "$(conda info --base 2>/dev/null)/etc/profile.d/conda.sh" ]; then
+    source "$(conda info --base)/etc/profile.d/conda.sh"
+else
+    echo "ERROR: Could not find conda.sh"
     exit 1
 fi
 
-# -----------------------------------------------------
-# CREATE PROJECT STRUCTURE (LOCAL ONLY)
-# -----------------------------------------------------
-mkdir -p "$PROJECT_ROOT/data/raw"
-mkdir -p "$PROJECT_ROOT/data/processed"
+#############################################
+# STEP 2 — Validate repo
+#############################################
 
-mkdir -p "$PROJECT_ROOT/models/checkpoints"
-mkdir -p "$PROJECT_ROOT/models/final"
+echo
+echo "STEP 2 — Validate repository"
 
-mkdir -p "$PROJECT_ROOT/notebooks"
-mkdir -p "$PROJECT_ROOT/scripts"
-
-mkdir -p "$PROJECT_ROOT/outputs/figures"
-mkdir -p "$PROJECT_ROOT/outputs/results"
-
-mkdir -p "$PROJECT_ROOT/docs"
-
-# -----------------------------------------------------
-# ENVIRONMENT
-# -----------------------------------------------------
-if [ ! -f "$PROJECT_ROOT/environment.yml" ]; then
-cat <<EOT > "$PROJECT_ROOT/environment.yml"
-name: nlp-core
-channels:
-  - conda-forge
-dependencies:
-  - python=3.11
-  - numpy
-  - pandas
-  - scikit-learn
-  - matplotlib
-  - jupyterlab
-EOT
+if [ ! -f "$ENV_FILE" ]; then
+    echo "ERROR: Missing $ENV_FILE"
+    exit 1
 fi
 
-# -----------------------------------------------------
-# README
-# -----------------------------------------------------
-if [ ! -f "$PROJECT_ROOT/README.md" ]; then
-cat <<EOT > "$PROJECT_ROOT/README.md"
-# Project
+#############################################
+# STEP 3 — Create/update env
+#############################################
 
-## Structure
-- data/
-- models/
-- notebooks/
-- scripts/
-- outputs/
-- docs/
+echo
+echo "STEP 3 — Environment setup"
 
-## Setup
-conda env create -f environment.yml
-conda activate nlp-core
-EOT
+if conda env list | awk '{print $1}' | grep -qx "$ENV_NAME"; then
+    echo "Updating existing environment"
+    conda env update -n "$ENV_NAME" -f "$ENV_FILE" --prune
+else
+    echo "Creating environment"
+    conda env create -f "$ENV_FILE"
 fi
 
-# -----------------------------------------------------
-# GITIGNORE
-# -----------------------------------------------------
-if [ ! -f "$PROJECT_ROOT/.gitignore" ]; then
-cat <<EOT > "$PROJECT_ROOT/.gitignore"
-__pycache__/
-*.pyc
-.env
-.ipynb_checkpoints/
-outputs/
-data/
-models/
-EOT
-fi
+#############################################
+# STEP 4 — Activate env
+#############################################
 
-echo "----------------------------------------"
-echo "Bootstrap complete (project-scoped)"
-echo "----------------------------------------"
+echo
+echo "STEP 4 — Activate environment"
+
+conda activate "$ENV_NAME"
+
+#############################################
+# STEP 5 — Verify
+#############################################
+
+echo
+echo "STEP 5 — Verifying environment"
+
+python - <<EOF
+import numpy, pandas, sklearn
+import transformers, sentence_transformers
+import umap, hdbscan
+import torch
+
+print("ALL GOOD")
+print("Torch:", torch.__version__)
+
+if torch.cuda.is_available():
+    print("CUDA: True")
+    print("GPU:", torch.cuda.get_device_name(0))
+else:
+    print("CUDA: False")
 EOF
+
+#############################################
+# DONE
+#############################################
+
+echo
+echo "============================================="
+echo "BOOTSTRAP COMPLETE"
+echo "============================================="
+echo
