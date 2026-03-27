@@ -1,3 +1,0 @@
-https://github.com/jpestian/bootstrap.git
-https://github.com/jpestian/nlp-core.git
-https://github.com/jpestian/ManifoldExperiments.git
