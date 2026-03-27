@@ -1,307 +1,138 @@
 #!/usr/bin/env bash
-
 set -euo pipefail
 
 #############################################
-# Machine profile
+# CONFIG
 #############################################
 
-MACHINE_TYPE=${1:-workstation}
+ENV_NAME="nlp-core"
+ENV_FILE="$HOME/projects/bootstrap/config/nlp-core.yml"
+
+#############################################
+# HEADER
+#############################################
 
 echo
 echo "============================================="
-echo "Research Workstation Bootstrap"
-echo "Machine type: $MACHINE_TYPE"
+echo "OSC Bootstrap (Pitzer + Ascend Ready)"
 echo "============================================="
 echo
 
 #############################################
-# Detect OS
+# Detect HPC
 #############################################
 
-if [[ "$(uname)" != "Linux" ]]; then
-    echo "This script is intended for Linux."
+if command -v module >/dev/null 2>&1; then
+    HPC_ENV=true
+else
+    echo "ERROR: This script is for OSC environments"
     exit 1
 fi
 
 #############################################
-# Utility functions
+# STEP 1 — Load Conda
 #############################################
 
-create_dir () {
-    if [ -d "$1" ]; then
-        echo "EXISTS   $1"
-    else
-        mkdir -p "$1"
-        echo "CREATED  $1"
-    fi
-}
+echo "STEP 1 — Load Conda"
+
+module purge
+module load miniconda3/24.1.2-py310
+
+eval "$(conda shell.bash hook)"
 
 #############################################
-# STEP 1 — Directory structure
+# STEP 2 — Create / Update Environment
 #############################################
 
-echo
-echo "STEP 1 — Create directory structure"
-echo
+echo "STEP 2 — Environment setup"
 
-create_dir ~/projects
-
-create_dir ~/research
-create_dir ~/research/datasets
-create_dir ~/research/datasets/raw
-create_dir ~/research/datasets/processed
-create_dir ~/research/embeddings
-
-create_dir ~/research/models
-create_dir ~/research/models/trained
-create_dir ~/research/models/checkpoints
-
-create_dir ~/artifacts
-create_dir ~/artifacts/manifolds
-create_dir ~/artifacts/clustering
-create_dir ~/artifacts/visualizations
-
-create_dir ~/containers
-create_dir ~/containers/defs
-create_dir ~/containers/images
-create_dir ~/containers/experiments
-
-create_dir ~/notebooks
-create_dir ~/papers
-create_dir ~/scripts
-create_dir ~/config
-create_dir ~/tmp
-
-#############################################
-# STEP 2 — Ensure scripts directory in PATH
-#############################################
-
-echo
-echo "STEP 2 — Ensure scripts directory in PATH"
-
-if grep -q "$HOME/scripts" ~/.bashrc; then
-    echo "PATH already configured"
+if conda env list | grep -q "$ENV_NAME"; then
+    echo "Environment exists — updating from YAML"
+    conda env update -n $ENV_NAME -f "$ENV_FILE" --prune
 else
-    echo 'export PATH=$PATH:$HOME/scripts' >> ~/.bashrc
-    echo "Added ~/scripts to PATH"
+    echo "Creating environment from YAML"
+    conda env create -f "$ENV_FILE"
 fi
 
 #############################################
-# STEP 3 — Install core utilities
+# STEP 3 — Activate Environment
 #############################################
 
-echo
-echo "STEP 3 — Install core utilities"
+echo "STEP 3 — Activate environment"
 
-sudo apt update
-
-sudo apt install -y \
-git \
-wget \
-curl \
-build-essential \
-tmux \
-htop \
-tree \
-ripgrep \
-fd-find \
-jq \
-cmake
+conda activate $ENV_NAME
 
 #############################################
-# STEP 4 — Install Miniconda
+# STEP 4 — Ensure PyTorch (GPU-ready)
 #############################################
 
-echo
-echo "STEP 4 — Install Miniconda"
+echo "STEP 4 — Ensure PyTorch"
 
-if [ -d "$HOME/miniconda3" ]; then
-    echo "Miniconda already installed"
+if ! python -c "import torch" >/dev/null 2>&1; then
+    echo "Installing PyTorch"
+    pip install torch --index-url https://download.pytorch.org/whl/cu121
 else
-
-    cd /tmp
-
-    wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-
-    bash Miniconda3-latest-Linux-x86_64.sh -b -p "$HOME/miniconda3"
-
-    rm Miniconda3-latest-Linux-x86_64.sh
-
-    echo "Miniconda installed"
-
+    echo "PyTorch already installed"
 fi
 
 #############################################
-# STEP 5 — Initialize Conda
+# STEP 5 — Directory Structure
 #############################################
 
-echo
-echo "STEP 5 — Initialize Conda"
+echo "STEP 5 — Directories"
 
-source "$HOME/miniconda3/etc/profile.d/conda.sh"
+mkdir -p ~/projects
+mkdir -p ~/research/{datasets/{raw,processed},embeddings,models/{trained,checkpoints}}
+mkdir -p ~/artifacts/{manifolds,clustering,visualizations}
+mkdir -p ~/notebooks ~/papers ~/scripts ~/config ~/tmp
 
 #############################################
-# STEP 6 — Restore conda environment
+# STEP 6 — GPU check (robust)
 #############################################
 
-echo
-echo "STEP 6 — Restore conda environment"
+echo "STEP 6 — GPU check"
 
-ENV_FILE="$HOME/projects/bootstrap/config/nlp_core_environment.yml"
-
-if [ -f "$ENV_FILE" ]; then
-
-    if conda env list | grep -q "nlp-core"; then
-        echo "Environment 'nlp-core' already exists"
-    else
-        echo "Creating NLP environment..."
-        conda env create -f "$ENV_FILE"
-    fi
-
-    conda activate nlp-core
-
+if python - <<EOF
+import torch
+exit(0 if torch.cuda.is_available() else 1)
+EOF
+then
+    echo "GPU available to job"
+    python -c "import torch; print(torch.cuda.get_device_name(0))"
 else
-    echo "No conda environment file found"
+    echo "No GPU available (expected on Pitzer or login node)"
 fi
 
 #############################################
-# STEP 7 — Install additional apt packages
+# STEP 7 — Verify Environment
 #############################################
 
-echo
-echo "STEP 7 — Install additional system packages"
+echo "STEP 7 — Verify"
 
-APT_FILE="$HOME/projects/bootstrap/config/installed_packages_apt.txt"
+python - <<EOF
+import numpy, pandas, sklearn
+import transformers, sentence_transformers
+import umap, hdbscan
+import torch
 
-if [ -f "$APT_FILE" ]; then
-    sudo apt install -y $(awk '{print $1}' "$APT_FILE")
-else
-    echo "No apt package list found"
-fi
-
-#############################################
-# STEP 8 — Configure git
-#############################################
-
-echo
-echo "STEP 8 — Configure git"
-
-git config --global init.defaultBranch main
-
-if ! git config --global user.name >/dev/null; then
-    git config --global user.name "John Pestian"
-fi
-
-if ! git config --global user.email >/dev/null; then
-    git config --global user.email "your_email_here"
-fi
+print("ALL GOOD")
+print("Torch:", torch.__version__)
+print("CUDA:", torch.cuda.is_available())
+EOF
 
 #############################################
-# STEP 9 — Ensure SSH key
+# STEP 8 — Export Clean YAML (optional sync)
 #############################################
 
-echo
-echo "STEP 9 — Ensure SSH key"
+echo "STEP 8 — Export environment snapshot"
 
-if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
-
-    ssh-keygen -t ed25519 -C "research" -f "$HOME/.ssh/id_ed25519" -N ""
-
-    echo
-    echo "SSH key created:"
-    cat "$HOME/.ssh/id_ed25519.pub"
-
-else
-    echo "SSH key already exists"
-fi
+conda env export | grep -v "^prefix:" > "$ENV_FILE"
 
 #############################################
-# STEP 10 — Clone repositories
-#############################################
-
-echo
-echo "STEP 10 — Clone repositories"
-
-REPO_LIST="$HOME/projects/bootstrap/config/github_repos.txt"
-
-cd ~/projects
-
-if [ -f "$REPO_LIST" ]; then
-
-    while IFS= read -r repo || [ -n "$repo" ]; do
-
-        [[ -z "$repo" || "$repo" =~ ^# ]] && continue
-
-        name=$(basename "$repo" .git)
-
-        if [ ! -d "$HOME/projects/$name" ]; then
-            echo "Cloning $name ..."
-            git clone "$repo"
-        else
-            echo "$name already present"
-        fi
-
-    done < "$REPO_LIST"
-
-else
-    echo "No repository list found"
-fi
-
-#############################################
-# STEP 11 — Machine-specific configuration
-#############################################
-
-echo
-echo "STEP 11 — Machine profile configuration"
-
-case "$MACHINE_TYPE" in
-
-workstation)
-    echo "Applying workstation settings"
-    ;;
-
-server)
-    echo "Applying server settings"
-    ;;
-
-nas)
-    echo "Applying NAS settings"
-    ;;
-
-*)
-    echo "Unknown machine type"
-    ;;
-
-esac
-
-#############################################
-# STEP 12 — System summary
+# DONE
 #############################################
 
 echo
 echo "============================================="
-echo "SYSTEM SUMMARY"
+echo "BOOTSTRAP COMPLETE"
 echo "============================================="
-
-echo
-echo "Hostname:"
-hostname
-
-echo
-echo "CPU:"
-lscpu | grep "Model name"
-
-echo
-echo "Memory:"
-free -h
-
-echo
-echo "Disks:"
-lsblk
-
-echo
-echo "============================================="
-echo "Bootstrap complete"
-echo "============================================="
-echo
