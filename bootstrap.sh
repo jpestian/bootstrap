@@ -1,138 +1,101 @@
-#!/usr/bin/env bash
-set -euo pipefail
+cd ~/projects/bootstrap
 
-#############################################
-# CONFIG
-#############################################
+cat > bootstrap.sh << 'EOF'
+#!/bin/bash
 
-ENV_NAME="nlp-core"
-ENV_FILE="$HOME/projects/bootstrap/config/nlp-core.yml"
+# =====================================================
+# Pestian Lab Bootstrap (PROJECT-CENTRIC ONLY)
+# =====================================================
 
-#############################################
-# HEADER
-#############################################
+set -e
 
-echo
-echo "============================================="
-echo "OSC Bootstrap (Pitzer + Ascend Ready)"
-echo "============================================="
-echo
+PROJECT_ROOT="$(pwd)"
 
-#############################################
-# Detect HPC
-#############################################
+echo "----------------------------------------"
+echo "Initializing project at:"
+echo "$PROJECT_ROOT"
+echo "----------------------------------------"
 
-if command -v module >/dev/null 2>&1; then
-    HPC_ENV=true
-else
-    echo "ERROR: This script is for OSC environments"
+# -----------------------------------------------------
+# SAFETY CHECK — must be inside ~/projects
+# -----------------------------------------------------
+if [[ "$PROJECT_ROOT" != *"/projects/"* ]]; then
+    echo "ERROR: Run this inside ~/projects/<project_name>"
     exit 1
 fi
 
-#############################################
-# STEP 1 — Load Conda
-#############################################
+# -----------------------------------------------------
+# CREATE PROJECT STRUCTURE (LOCAL ONLY)
+# -----------------------------------------------------
+mkdir -p "$PROJECT_ROOT/data/raw"
+mkdir -p "$PROJECT_ROOT/data/processed"
 
-echo "STEP 1 — Load Conda"
+mkdir -p "$PROJECT_ROOT/models/checkpoints"
+mkdir -p "$PROJECT_ROOT/models/final"
 
-module purge
-module load miniconda3/24.1.2-py310
+mkdir -p "$PROJECT_ROOT/notebooks"
+mkdir -p "$PROJECT_ROOT/scripts"
 
-eval "$(conda shell.bash hook)"
+mkdir -p "$PROJECT_ROOT/outputs/figures"
+mkdir -p "$PROJECT_ROOT/outputs/results"
 
-#############################################
-# STEP 2 — Create / Update Environment
-#############################################
+mkdir -p "$PROJECT_ROOT/docs"
 
-echo "STEP 2 — Environment setup"
-
-if conda env list | grep -q "$ENV_NAME"; then
-    echo "Environment exists — updating from YAML"
-    conda env update -n $ENV_NAME -f "$ENV_FILE" --prune
-else
-    echo "Creating environment from YAML"
-    conda env create -f "$ENV_FILE"
+# -----------------------------------------------------
+# ENVIRONMENT
+# -----------------------------------------------------
+if [ ! -f "$PROJECT_ROOT/environment.yml" ]; then
+cat <<EOT > "$PROJECT_ROOT/environment.yml"
+name: nlp-core
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - scikit-learn
+  - matplotlib
+  - jupyterlab
+EOT
 fi
 
-#############################################
-# STEP 3 — Activate Environment
-#############################################
+# -----------------------------------------------------
+# README
+# -----------------------------------------------------
+if [ ! -f "$PROJECT_ROOT/README.md" ]; then
+cat <<EOT > "$PROJECT_ROOT/README.md"
+# Project
 
-echo "STEP 3 — Activate environment"
+## Structure
+- data/
+- models/
+- notebooks/
+- scripts/
+- outputs/
+- docs/
 
-conda activate $ENV_NAME
-
-#############################################
-# STEP 4 — Ensure PyTorch (GPU-ready)
-#############################################
-
-echo "STEP 4 — Ensure PyTorch"
-
-if ! python -c "import torch" >/dev/null 2>&1; then
-    echo "Installing PyTorch"
-    pip install torch --index-url https://download.pytorch.org/whl/cu121
-else
-    echo "PyTorch already installed"
+## Setup
+conda env create -f environment.yml
+conda activate nlp-core
+EOT
 fi
 
-#############################################
-# STEP 5 — Directory Structure
-#############################################
+# -----------------------------------------------------
+# GITIGNORE
+# -----------------------------------------------------
+if [ ! -f "$PROJECT_ROOT/.gitignore" ]; then
+cat <<EOT > "$PROJECT_ROOT/.gitignore"
+__pycache__/
+*.pyc
+.env
+.ipynb_checkpoints/
+outputs/
+data/
+models/
+EOT
+fi
 
-echo "STEP 5 — Directories"
-
-mkdir -p ~/projects
-mkdir -p ~/research/{datasets/{raw,processed},embeddings,models/{trained,checkpoints}}
-mkdir -p ~/artifacts/{manifolds,clustering,visualizations}
-mkdir -p ~/notebooks ~/papers ~/scripts ~/config ~/tmp
-
-#############################################
-# STEP 6 — GPU check (robust)
-#############################################
-
-echo "STEP 6 — GPU check"
-
-if python - <<EOF
-import torch
-exit(0 if torch.cuda.is_available() else 1)
+echo "----------------------------------------"
+echo "Bootstrap complete (project-scoped)"
+echo "----------------------------------------"
 EOF
-then
-    echo "GPU available to job"
-    python -c "import torch; print(torch.cuda.get_device_name(0))"
-else
-    echo "No GPU available (expected on Pitzer or login node)"
-fi
-
-#############################################
-# STEP 7 — Verify Environment
-#############################################
-
-echo "STEP 7 — Verify"
-
-python - <<EOF
-import numpy, pandas, sklearn
-import transformers, sentence_transformers
-import umap, hdbscan
-import torch
-
-print("ALL GOOD")
-print("Torch:", torch.__version__)
-print("CUDA:", torch.cuda.is_available())
-EOF
-
-#############################################
-# STEP 8 — Export Clean YAML (optional sync)
-#############################################
-
-echo "STEP 8 — Export environment snapshot"
-
-conda env export | grep -v "^prefix:" > "$ENV_FILE"
-
-#############################################
-# DONE
-#############################################
-
-echo
-echo "============================================="
-echo "BOOTSTRAP COMPLETE"
-echo "============================================="
