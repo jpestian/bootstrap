@@ -1,4 +1,3 @@
-# datasets and artifacts
 datasets/
 artifacts/
 tmp/
@@ -9,6 +8,14 @@ tmp/
 *.pt
 *.ckpt
 *.model
+
+# Exceptions — commit raw data
+!data/raw/*.csv
+!data/raw/*.tsv
+!data/raw/*.json
+!data/raw/*.txt
+!data/raw/*.parquet
+!data/raw/*.npy
 
 # python
 __pycache__/
