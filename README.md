@@ -13,8 +13,8 @@ before acting.
 
 ## Status
 
-This is a working setup repo, actively maintained by hand. In this session the
-two configuration files were updated:
+This is a working setup repo, actively maintained by hand. The most recent
+changes (now committed) updated the two configuration files:
 
 - **`config/github_repos.txt`** — switched from HTTPS to SSH (`git@github.com:…`)
   remotes and expanded the clone list to six repos: `bootstrap`, `nlp-core`,
@@ -153,3 +153,5 @@ dpkg --get-selections > config/installed_packages_apt.txt
 ## Author
 
 John Pestian
+<-rw-rw-r-- 1 jpestian jpestian 2136 Jul 2 14:32 sessionend test -->
+<-rw-rw-r-- 1 jpestian jpestian 2136 Jul 2 14:32 sessionend test -->

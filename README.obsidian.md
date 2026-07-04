@@ -21,7 +21,7 @@ and SSH, and clones the working repos. Idempotent — re-running it is safe.
 > same Python environment, same cloned projects, same dataset paths. This repo
 > is the source of truth for that baseline.
 
-## What changed this session
+## Recent changes (committed)
 
 - **#repos** — `config/github_repos.txt` moved from HTTPS to SSH remotes and
   grew to six: `bootstrap`, `nlp-core`, `ManifoldExperiments`, `litreview`,

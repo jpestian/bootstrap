@@ -5,14 +5,17 @@
 Documentation-only pass just completed. `README.md`, `README.obsidian.md`, and
 this file were regenerated to match the current tree. No source code changed.
 
-Uncommitted working-tree changes from this session (config only):
+Git state:
 
-- `config/github_repos.txt` — now SSH remotes; added `litreview`,
-  `sacredtext`, `obsidian-vault` (six repos total).
-- `config/nlp_core_environment.yml` — re-exported with current package pins;
-  its `name:` field is now `base`.
-
-Nothing has been committed — the SessionEnd tooling handles git.
+- The config changes from the prior session are **committed** in `b34a511`
+  ("SessionEnd: refresh docs for bootstrap"), along with the doc set. That
+  commit is ahead of `origin/main` by 1 and has not been pushed.
+  - `config/github_repos.txt` — SSH remotes; six repos (`bootstrap`,
+    `nlp-core`, `ManifoldExperiments`, `litreview`, `sacredtext`,
+    `obsidian-vault`).
+  - `config/nlp_core_environment.yml` — re-exported pins; `name:` is `base`.
+- `README.md` currently has a small **uncommitted local edit** (two trailing
+  `sessionend test` marker lines). Left in place intentionally.
 
 ## Next steps (ordered)
 
@@ -31,7 +34,8 @@ Nothing has been committed — the SessionEnd tooling handles git.
 4. **Confirm SSH-clone prerequisite.** With SSH remotes, STEP 10 needs the
    machine's key registered on GitHub first (STEP 9 generates and prints it,
    but does not upload it). Consider a note/pause in the script.
-5. **Commit** the config changes + regenerated docs once the above are settled.
+5. **Push** `b34a511` to `origin/main` once the above are settled (and decide
+   whether the `README.md` marker lines should stay).
 
 ## Open questions / risks
 
@@ -55,4 +59,4 @@ Nothing has been committed — the SessionEnd tooling handles git.
 - Regenerate manifests:
   - `conda env export --no-builds > config/nlp_core_environment.yml`
   - `dpkg --get-selections > config/installed_packages_apt.txt`
-- Inspect this session's diff: `git diff config/`
+- Inspect recent history: `git show b34a511 --stat`
