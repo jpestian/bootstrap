@@ -13,9 +13,10 @@ before acting.
 
 ## Status
 
-This is a working setup repo, actively maintained by hand. The config changes
-and documentation from recent sessions are committed and merged into `main`.
-The most recent config work:
+Stable. The working tree is clean and in sync with `origin/main`; no source or
+config changed in this session (documentation pass only).
+
+The most recent substantive work, already committed and merged:
 
 - **`config/github_repos.txt`** — switched from HTTPS to SSH (`git@github.com:…`)
   remotes and expanded the clone list to six repos: `bootstrap`, `nlp-core`,
@@ -24,9 +25,9 @@ The most recent config work:
   from a current machine export (conda 26.1.1, Python 3.13.12, etc.).
 
 > **Known inconsistencies (not yet resolved):**
-> - The environment file now declares `name: base`, but `bootstrap.sh`
->   (STEP 6) still creates and activates an environment called `nlp-core`.
->   These need to be reconciled before the env step will behave as intended.
+> - The environment file declares `name: base`, but `bootstrap.sh` (STEP 6)
+>   still creates and activates an environment called `nlp-core`. These need to
+>   be reconciled before the env step will behave as intended.
 > - The exported environment currently contains only the conda/anaconda base
 >   toolchain — it does **not** pin any NLP/ML libraries (no numpy, torch,
 >   transformers, etc.).
@@ -64,6 +65,19 @@ placeholder for future machine-specific configuration.
 - For SSH clone URLs, a GitHub-registered SSH key. STEP 9 generates
   `~/.ssh/id_ed25519` if one does not exist and prints the public key; add it
   to GitHub before the clone step can succeed.
+
+### Tests and builds
+
+There is no test suite and nothing to build — this repository is a shell script
+plus configuration manifests. The closest thing to a check is a dry syntax
+parse of the script:
+
+```bash
+bash -n bootstrap.sh
+```
+
+Verification is done by running the script and inspecting the result (see the
+validation steps in `docs/WORKFLOW.md`).
 
 ## What `bootstrap.sh` does
 

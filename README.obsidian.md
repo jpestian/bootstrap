@@ -21,7 +21,10 @@ and SSH, and clones the working repos. Idempotent — re-running it is safe.
 > same Python environment, same cloned projects, same dataset paths. This repo
 > is the source of truth for that baseline.
 
-## Recent changes (committed & merged to `main`)
+## Where it stands
+
+Clean tree, in sync with `origin/main`. Nothing changed this session — the last
+substantive work is already committed:
 
 - **#repos** — `config/github_repos.txt` moved from HTTPS to SSH remotes and
   grew to six: `bootstrap`, `nlp-core`, `ManifoldExperiments`, `litreview`,
@@ -40,13 +43,13 @@ and SSH, and clones the working repos. Idempotent — re-running it is safe.
 
 ## Mental model
 
-Think of it as three manifests plus a driver:
+Three manifests plus a driver:
 
 - **Driver** — `bootstrap.sh`, twelve guarded steps.
 - **What to clone** — `config/github_repos.txt`.
 - **Python env** — `config/nlp_core_environment.yml`.
 - **System packages** — `config/installed_packages_apt.txt` (~2,300 entries;
-  a full `dpkg --get-selections` dump).
+  a full `dpkg --get-selections` dump, not a curated list).
 
 ## The twelve steps at a glance
 
