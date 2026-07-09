@@ -153,5 +153,3 @@ dpkg --get-selections > config/installed_packages_apt.txt
 ## Author
 
 John Pestian
-<-rw-rw-r-- 1 jpestian jpestian 2136 Jul 2 14:32 sessionend test -->
-<-rw-rw-r-- 1 jpestian jpestian 2136 Jul 2 14:32 sessionend test -->

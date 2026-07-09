@@ -1,0 +1,28 @@
+name: nlp-core
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.11
+  - pip
+
+  - numpy
+  - pandas
+  - scipy
+  - scikit-learn
+  - matplotlib
+  - seaborn
+  - jupyterlab
+
+  - pip:
+
+      # force clean ML stack
+      - torch==2.5.1
+      - transformers>=4.40
+      - sentence-transformers>=2.6
+
+      - umap-learn
+      - hdbscan
+      - tqdm

@@ -1,8 +1,9 @@
 # Research Workstation Bootstrap Workflow
 
-This document describes the **complete workflow for installing and configuring a new research workstation** so that it matches existing systems.
+This document describes the **complete workflow for installing and configuring
+a new research workstation or HPC account** so that it matches existing systems.
 
-The goal is to ensure every workstation shares:
+The goal is to ensure every machine shares:
 
 - identical directory structure
 - identical Conda environments
@@ -14,19 +15,15 @@ The goal is to ensure every workstation shares:
 
 # 0. Overview
 
-Full setup process:
+Two machine types are supported:
 
-1. Create Ubuntu installer USB  
-2. Boot machine from USB  
-3. Install Ubuntu  
-4. Update system  
-5. Clone bootstrap repository  
-6. Run bootstrap script  
-7. Install Syncthing  
-8. Configure synchronization  
-9. Verify environment  
+| Type | Examples | Section |
+|------|----------|---------|
+| Lab workstation | 5860tower, ms-a2 | Steps 1–16 |
+| OSC HPC account | Pitzer, Owens | Step 17 |
 
-After completion the workstation will behave **identically to existing machines**.
+Both use the same bootstrap repository and the same `source bootstrap.sh`
+command. The script detects the environment automatically.
 
 ---
 
@@ -169,35 +166,38 @@ cd ~
 Clone the workstation bootstrap repository:
 
 ```bash
-git clone https://github.com/jpestian/workstation-bootstrap.git
+git clone https://github.com/jpestian/bootstrap.git
 ```
 
 Enter the repository:
 
 ```bash
-cd workstation-bootstrap
+cd bootstrap
 ```
 
 ---
 
 # 7. Run Bootstrap Script
 
-Execute the bootstrap script:
+The script must be **sourced**, not executed, so the Conda environment
+persists in your shell after it completes:
 
 ```bash
-bash setup_research_environment.sh
+source bootstrap.sh
 ```
 
-The script performs the following:
+The script performs the following automatically:
 
-- creates standardized research directories
-- installs Miniconda if missing
-- initializes Conda
-- restores the NLP environment
-- clones research repositories
-- configures PATH for scripts
+- loads Miniconda (lab: local install, OSC: module system)
+- creates or updates the `nlp-core` Conda environment
+- detects GPU via `nvidia-smi` and installs the correct PyTorch build
+- verifies all required packages load correctly
 
-The script is **idempotent**, meaning it can safely run multiple times.
+The script is **idempotent** — safe to run multiple times. Re-running it
+updates an existing environment rather than recreating it.
+
+> **Note:** Do not run as `bash bootstrap.sh`. That spawns a subshell and
+> the conda activation will not persist in your terminal.
 
 ---
 
@@ -250,25 +250,19 @@ conda env list
 Expected environment:
 
 ```
-nlp-core
+nlp-core    *
 ```
 
-Activate environment:
+The `*` confirms the environment is active. If it is not active:
 
 ```bash
 conda activate nlp-core
 ```
 
-Test Python:
-
-```bash
-python
-```
-
-Exit Python:
+Your prompt should show:
 
 ```
-exit()
+(nlp-core) username@hostname:~$
 ```
 
 ---
@@ -308,7 +302,7 @@ Approve the connection on both machines.
 Recommended configuration:
 
 | Folder | Mode |
-|------|------|
+|--------|------|
 | `~/projects` | Send & Receive |
 | `~/scripts` | Send & Receive |
 | `~/papers` | Send & Receive |
@@ -375,7 +369,13 @@ Start Python:
 python
 ```
 
-Verify required libraries load correctly.
+Verify required libraries load correctly:
+
+```python
+import torch
+print(torch.__version__)
+print(torch.cuda.is_available())
+```
 
 ---
 
@@ -396,13 +396,109 @@ The workstation is now fully configured.
 
 ---
 
+# 17. OSC HPC Setup
+
+This section covers bootstrapping an OSC account on Pitzer or Owens.
+The same repository and script are used — the script detects the HPC
+environment automatically via the module system.
+
+## 17.1 Log in to OSC
+
+```bash
+ssh username@pitzer.osc.edu
+# or
+ssh username@owens.osc.edu
+```
+
+## 17.2 Check the Miniconda module name
+
+Module versions change when OSC upgrades software. Always verify before
+running the bootstrap:
+
+```bash
+module avail miniconda
+```
+
+Note the exact module string shown, for example:
+
+```
+miniconda3/24.1.2-py310
+miniconda3/24.7.0-py311
+```
+
+## 17.3 Clone the bootstrap repository
+
+```bash
+cd ~
+git clone https://github.com/jpestian/bootstrap.git
+cd bootstrap
+```
+
+## 17.4 Run the bootstrap script
+
+If the module name matches the default (`miniconda3/24.1.2-py310`):
+
+```bash
+source bootstrap.sh
+```
+
+If the module name has changed, override it inline:
+
+```bash
+MINICONDA_MODULE=miniconda3/24.7.0-py311 source bootstrap.sh
+```
+
+The script will:
+
+- purge existing modules and load the correct Miniconda module
+- create or update the `nlp-core` environment
+- detect the GPU allocation and install the CUDA PyTorch wheel
+- verify all packages
+
+## 17.5 Update the default module name (if changed)
+
+If you had to override the module name, update the default in `bootstrap.sh`
+so future runs do not require the override:
+
+```bash
+# edit the CONFIG block at the top of bootstrap.sh
+MINICONDA_MODULE="${MINICONDA_MODULE:-miniconda3/24.7.0-py311}"
+```
+
+Then push to GitHub:
+
+```bash
+git add bootstrap.sh
+git commit -m "update OSC miniconda module version"
+git push
+```
+
+## 17.6 Future OSC sessions
+
+The bootstrap only needs to run once per OSC account. For subsequent sessions
+just activate the environment after logging in:
+
+```bash
+module load miniconda3/24.1.2-py310
+conda activate nlp-core
+```
+
+Or add both lines to your `~/.bashrc` on OSC so they run automatically on
+login:
+
+```bash
+echo "module load miniconda3/24.1.2-py310" >> ~/.bashrc
+echo "conda activate nlp-core" >> ~/.bashrc
+```
+
+---
+
 # Result
 
-The workstation now provides:
+Every machine — lab workstation or OSC node — provides:
 
 - identical research directory structure
 - identical Python environment
 - synchronized project repositories
 - shared dataset access
 - reproducible research infrastructure
-
