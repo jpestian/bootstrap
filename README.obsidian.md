@@ -6,7 +6,7 @@ tags:
   - research-ops
   - conda
   - reproducibility
-updated: 2026-07-02
+updated: 2026-07-09
 ---
 
 # Bootstrap
@@ -21,7 +21,7 @@ and SSH, and clones the working repos. Idempotent — re-running it is safe.
 > same Python environment, same cloned projects, same dataset paths. This repo
 > is the source of truth for that baseline.
 
-## Recent changes (committed)
+## Recent changes (committed & merged to `main`)
 
 - **#repos** — `config/github_repos.txt` moved from HTTPS to SSH remotes and
   grew to six: `bootstrap`, `nlp-core`, `ManifoldExperiments`, `litreview`,

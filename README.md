@@ -13,8 +13,9 @@ before acting.
 
 ## Status
 
-This is a working setup repo, actively maintained by hand. The most recent
-changes (now committed) updated the two configuration files:
+This is a working setup repo, actively maintained by hand. The config changes
+and documentation from recent sessions are committed and merged into `main`.
+The most recent config work:
 
 - **`config/github_repos.txt`** — switched from HTTPS to SSH (`git@github.com:…`)
   remotes and expanded the clone list to six repos: `bootstrap`, `nlp-core`,

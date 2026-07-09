@@ -7,15 +7,15 @@ this file were regenerated to match the current tree. No source code changed.
 
 Git state:
 
-- The config changes from the prior session are **committed** in `b34a511`
-  ("SessionEnd: refresh docs for bootstrap"), along with the doc set. That
-  commit is ahead of `origin/main` by 1 and has not been pushed.
+- Working tree is clean and up to date with `origin/main`; the config and doc
+  work from prior sessions is committed and merged (latest: `0e9df7f`).
+- Only untracked item is `.push_test` (a throwaway artifact — safe to delete;
+  not part of the project).
+- Config baseline in `main`:
   - `config/github_repos.txt` — SSH remotes; six repos (`bootstrap`,
     `nlp-core`, `ManifoldExperiments`, `litreview`, `sacredtext`,
     `obsidian-vault`).
   - `config/nlp_core_environment.yml` — re-exported pins; `name:` is `base`.
-- `README.md` currently has a small **uncommitted local edit** (two trailing
-  `sessionend test` marker lines). Left in place intentionally.
 
 ## Next steps (ordered)
 
@@ -34,8 +34,7 @@ Git state:
 4. **Confirm SSH-clone prerequisite.** With SSH remotes, STEP 10 needs the
    machine's key registered on GitHub first (STEP 9 generates and prints it,
    but does not upload it). Consider a note/pause in the script.
-5. **Push** `b34a511` to `origin/main` once the above are settled (and decide
-   whether the `README.md` marker lines should stay).
+5. **Tidy up.** Remove the stray `.push_test` file if it is not needed.
 
 ## Open questions / risks
 
@@ -59,4 +58,4 @@ Git state:
 - Regenerate manifests:
   - `conda env export --no-builds > config/nlp_core_environment.yml`
   - `dpkg --get-selections > config/installed_packages_apt.txt`
-- Inspect recent history: `git show b34a511 --stat`
+- Recent history: `git log --oneline -5`
