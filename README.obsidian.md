@@ -6,7 +6,7 @@ tags:
   - research-ops
   - conda
   - reproducibility
-updated: 2026-07-09
+updated: 2026-07-10
 ---
 
 # Bootstrap
