@@ -7,7 +7,7 @@ regenerated; no source or config was modified.
 
 Git state:
 
-- Working tree **clean**, in sync with `origin/main`. Latest commit: `2164f09`
+- Working tree **clean**, in sync with `origin/main`. Latest commit: `a3977b7`
   ("SessionEnd: refresh docs for bootstrap").
 - No changes were made to the repo this session beyond these three docs.
 - Config baseline in `main`:
@@ -17,6 +17,8 @@ Git state:
   - `config/nlp_core_environment.yml` — re-exported pins; `name:` is `base`.
 
 Nothing is blocked. The items below are pre-existing, known, and unaddressed.
+Several consecutive sessions have been doc-only refreshes — the substantive
+fixes below have not been started.
 
 ## Next steps (ordered)
 
@@ -25,7 +27,8 @@ Nothing is blocked. The items below are pre-existing, known, and unaddressed.
    Either set the YAML back to `name: nlp-core` (likely correct) or update the
    script. As-is, `conda env create -f` would target `base`, and the activate
    step would fail on a clean machine. **This is the highest-value fix** — it is
-   the one bug that would actually break a fresh bootstrap.
+   the one bug that would actually break a fresh bootstrap, and it is a
+   roughly one-line change.
 2. **Decide what belongs in the env.** The current export is only the
    conda/anaconda base toolchain — no numpy/torch/transformers/etc. Either
    populate `nlp-core` with the real ML stack and re-export, or document that a
