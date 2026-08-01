@@ -1,169 +1,145 @@
-# Research Workstation Bootstrap
+# bootstrap
 
-This repository provisions a reproducible research workstation for NLP and
-machine-learning work. A single idempotent shell script (`bootstrap.sh`)
-creates a standard directory layout, installs core tooling and Miniconda,
-restores a Conda environment, configures Git and SSH, and clones the working
-set of research repositories. The goal is that any freshly installed Linux
-machine can be brought to a known-good, identical-across-machines state with
-one command.
+Reproducible Conda environment setup for Pestian Lab NLP/ML work. A single
+idempotent script (`bootstrap.sh`) creates or updates the `nlp-core` Conda
+environment from a checked-in spec, activates it, and verifies that the core
+scientific and NLP libraries import cleanly. The same script runs on lab
+workstations and on OSC HPC nodes — it loads Miniconda via the module system
+when one is present, and via a local install otherwise. The repository also
+carries the standard lab project scaffold (`data/`, `models/`, `outputs/`,
+`logs/`) so a research project can be started from a known layout.
 
-The script is safe to run repeatedly — every step checks for existing state
-before acting.
+`WORKFLOW.md` is the broader runbook: bare-metal Ubuntu install through
+Syncthing setup and OSC account provisioning.
 
 ## Status
 
-Stable. The working tree is clean and in sync with `origin/main`; no source or
-config changed in this session (documentation pass only).
+Stable, working tree clean, in sync with `origin/main`.
 
-The most recent substantive work, already committed and merged:
+This session's only substantive change was commit `1aea36d`, which removed
+`obsidian-vault` from `config/github_repos.txt`, leaving five repositories in
+the list. Everything else this session was documentation.
 
-- **`config/github_repos.txt`** — switched from HTTPS to SSH (`git@github.com:…`)
-  remotes and expanded the clone list to six repos: `bootstrap`, `nlp-core`,
-  `ManifoldExperiments`, `litreview`, `sacredtext`, and `obsidian-vault`.
-- **`config/nlp_core_environment.yml`** — refreshed pinned package versions
-  from a current machine export (conda 26.1.1, Python 3.13.12, etc.).
+> **Documentation drift — `WORKFLOW.md` overstates what the script does.**
+> Verified against the current `bootstrap.sh`:
+>
+> - It does **not** create the `~/research`, `~/artifacts`, `~/containers`,
+>   `~/notebooks`, `~/papers`, `~/scripts`, `~/config`, `~/tmp` tree described
+>   in WORKFLOW.md §8. Only the Conda environment is handled.
+> - It does **not** detect a GPU via `nvidia-smi` or select a CUDA-matched
+>   PyTorch build. `config/nlp-core.yml` pins `torch==2.5.1` from PyPI — the
+>   default wheel. The verify step reports whether CUDA happens to be available;
+>   it does not install for it.
+> - It does **not** honor a `MINICONDA_MODULE` override. The module string
+>   `miniconda3/24.1.2-py310` is hardcoded at line 33.
+> - It does not clone repositories; `config/github_repos.txt` is a manifest
+>   nothing reads.
+>
+> These are documentation bugs, not script bugs — the script does what it does
+> correctly. See `NEXT_SESSION.md` for the resolution options.
 
-> **Known inconsistencies (not yet resolved):**
-> - The environment file declares `name: base`, but `bootstrap.sh` (STEP 6)
->   still creates and activates an environment called `nlp-core`. These need to
->   be reconciled before the env step will behave as intended.
-> - The exported environment currently contains only the conda/anaconda base
->   toolchain — it does **not** pin any NLP/ML libraries (no numpy, torch,
->   transformers, etc.).
-> - `docs/WORKFLOW.md` still refers to an older repo name
->   (`workstation-bootstrap`) and script name (`setup_research_environment.sh`).
->   The current names are `bootstrap` and `bootstrap.sh`.
-
-## Setup and usage
-
-Clone the repository into `~/projects` (the script expects it at
-`~/projects/bootstrap`) and run the bootstrap script:
+## Setup
 
 ```bash
 git clone git@github.com:jpestian/bootstrap.git ~/projects/bootstrap
 cd ~/projects/bootstrap
-bash bootstrap.sh
+source bootstrap.sh
 ```
 
-An optional machine profile can be passed as the first argument (defaults to
-`workstation`):
+**Source it, do not execute it.** `bash bootstrap.sh` runs in a subshell, so
+the `conda activate nlp-core` in STEP 4 does not persist in your terminal.
 
-```bash
-bash bootstrap.sh workstation
-bash bootstrap.sh server
-bash bootstrap.sh nas
-```
-
-The profile currently only prints which settings would be applied — it is a
-placeholder for future machine-specific configuration.
+> **Caveat:** the script sets `set -euo pipefail` at the top. When sourced,
+> those options apply to your interactive shell, and a failure mid-script will
+> close the terminal. If a run fails, open a fresh shell before retrying.
 
 ### Requirements
 
-- Linux (the script exits on any non-Linux OS).
-- `sudo` access — several steps run `apt update` / `apt install`.
-- For SSH clone URLs, a GitHub-registered SSH key. STEP 9 generates
-  `~/.ssh/id_ed25519` if one does not exist and prints the public key; add it
-  to GitHub before the clone step can succeed.
+- Conda (Miniconda/Anaconda) reachable via `conda info --base`, or an
+  environment-modules system providing `miniconda3/24.1.2-py310`.
+- Network access for the conda-forge and PyPI downloads.
+- No `sudo` is needed — the script installs nothing at the system level.
 
-### Tests and builds
+### On OSC (Pitzer / Owens)
 
-There is no test suite and nothing to build — this repository is a shell script
-plus configuration manifests. The closest thing to a check is a dry syntax
-parse of the script:
+The module system is detected automatically. If OSC has upgraded and
+`miniconda3/24.1.2-py310` no longer exists, check `module avail miniconda` and
+edit line 33 of `bootstrap.sh` — there is no override variable despite what
+WORKFLOW.md §17.4 says.
+
+## Run, test, build
+
+There is nothing to build, and there is no test suite — this repository is one
+shell script plus configuration. The available checks:
 
 ```bash
-bash -n bootstrap.sh
+bash -n bootstrap.sh          # syntax parse only
+source bootstrap.sh           # full run; STEP 5 is the real verification
+conda env list                # confirm nlp-core exists and is active
 ```
 
-Verification is done by running the script and inspecting the result (see the
-validation steps in `docs/WORKFLOW.md`).
+STEP 5 imports `numpy`, `pandas`, `sklearn`, `transformers`,
+`sentence_transformers`, `umap`, `hdbscan`, and `torch`, then prints
+`ALL GOOD`, the Torch version, and CUDA availability. Any import failure exits
+non-zero.
+
+The script is idempotent: an existing `nlp-core` is updated with
+`conda env update --prune`; otherwise it is created.
 
 ## What `bootstrap.sh` does
 
-Twelve sequential, guarded steps:
+Five steps, ~110 lines:
 
-1. **Directory structure** — creates the standard `~/research`, `~/artifacts`,
-   `~/containers`, `~/notebooks`, `~/papers`, `~/scripts`, `~/config`, `~/tmp`,
-   and `~/projects` tree.
-2. **PATH** — appends `~/scripts` to `PATH` in `~/.bashrc` if absent.
-3. **Core utilities** — `apt install` git, wget, curl, build-essential, tmux,
-   htop, tree, ripgrep, fd-find, jq, cmake.
-4. **Miniconda** — installs to `~/miniconda3` if not already present.
-5. **Conda init** — sources `conda.sh`.
-6. **Conda environment** — creates `nlp-core` from
-   `config/nlp_core_environment.yml` if it does not exist, then activates it.
-   (See the env-name caveat above.)
-7. **Additional apt packages** — installs everything listed in
-   `config/installed_packages_apt.txt`.
-8. **Git** — sets `init.defaultBranch main` and default user name/email if unset.
-9. **SSH key** — generates an ed25519 key if missing and prints the public key.
-10. **Clone repositories** — clones every non-comment line in
-    `config/github_repos.txt` into `~/projects`.
-11. **Machine profile** — prints the profile-specific message (placeholder).
-12. **System summary** — prints hostname, CPU, memory, and disk layout.
+1. **Initialize Conda** — `module purge` + `module load miniconda3/24.1.2-py310`
+   if `module` exists, then source `conda.sh` from `$(conda info --base)`. Exits
+   if `conda.sh` cannot be found.
+2. **Validate repository** — confirm `config/nlp-core.yml` is present.
+3. **Environment setup** — `conda env update -n nlp-core --prune` if the env
+   exists, else `conda env create`.
+4. **Activate** — `conda activate nlp-core`.
+5. **Verify** — import the core stack and report Torch/CUDA status.
 
-## Standard directory layout
-
-The script creates this tree in the user's home directory:
+## Directory layout
 
 ```
-~/projects                      # Git repositories
-~/research
-  datasets/{raw,processed}      # datasets
-  embeddings
-  models/{trained,checkpoints}
-~/artifacts                     # experiment outputs
-  {manifolds,clustering,visualizations}
-~/containers
-  {defs,images,experiments}
-~/notebooks
-~/papers
-~/scripts                       # operational utilities (added to PATH)
-~/config
-~/tmp
-```
-
-## Repository layout
-
-```
-bootstrap.sh                    # the main provisioning script
+bootstrap.sh                       # the provisioning script (5 steps)
+WORKFLOW.md                        # full runbook: USB → Ubuntu → bootstrap → Syncthing → OSC
 config/
-  github_repos.txt              # repos to clone (SSH URLs, one per line)
-  nlp_core_environment.yml      # exported Conda environment
-  installed_packages_apt.txt    # `apt` package manifest (dpkg --get-selections)
-docs/
-  README.md                     # earlier project README (superseded by this file)
-  WORKFLOW.md                   # full bare-metal → running-workstation runbook
-project_template/               # scaffold copied when starting a new project
-  {data,src,scripts,notebooks,artifacts,results,docs,environment}/
-  README.md
-artifacts/ data/ notebooks/ results/ scripts/ src/ environment/
-                                # empty working dirs mirroring the template
+  nlp-core.yml                     # THE environment spec — the only file bootstrap.sh reads
+  nlp_core_environment.yml         # stale full export; unused (see below)
+  github_repos.txt                 # 5 lab repos, SSH URLs; manifest only, nothing reads it
+scripts/
+  files.zip                        # archive of uncertain provenance — not referenced anywhere
+data/{raw,processed,embeddings}/   # project scaffold, .gitkeep placeholders
+models/{trained,checkpoints}/
+outputs/{results,figures}/
+logs/
+.push_test                         # leftover from auto-push testing; safe to delete
 ```
 
-Note: the top-level `artifacts/`, `data/`, `notebooks/`, `results/`,
-`scripts/`, `src/`, and `environment/` directories are empty scaffolding and
-are not tracked in Git.
+### The two environment files
 
-## Regenerating the config manifests
+Only `config/nlp-core.yml` is used. It is a hand-maintained spec:
+Python 3.11 with numpy, pandas, scipy, scikit-learn, matplotlib, seaborn, and
+jupyterlab from conda-forge, plus `torch==2.5.1`, transformers, 
+sentence-transformers, umap-learn, hdbscan, and tqdm from pip.
 
-The two config manifests are exports from a reference machine and are meant to
-be regenerated when the environment changes:
+`config/nlp_core_environment.yml` is a `conda env export` of somebody's **base**
+environment — it declares `name: base`, pins Python 3.13.12, and contains only
+the conda/anaconda toolchain with no ML libraries. Nothing reads it. It is a
+leftover and is a likely source of confusion; deleting it is proposed in
+`NEXT_SESSION.md`.
 
-```bash
-# Conda environment
-conda env export --no-builds > config/nlp_core_environment.yml   # or with builds
+### Git ignore behavior
 
-# apt package selections
-dpkg --get-selections > config/installed_packages_apt.txt
-```
+`.gitignore` excludes `*.parquet`, `*.npy`, `*.pt`, `*.ckpt`, and `*.model`
+repo-wide, but re-includes `data/raw/*.{csv,tsv,json,txt,parquet,npy}` so raw
+inputs can be committed alongside a project.
 
 ## Related docs
 
-- `docs/WORKFLOW.md` — end-to-end runbook covering USB creation, Ubuntu
-  install, running bootstrap, and Syncthing setup (note the stale names above).
-- `project_template/README.md` — template README for new research projects.
+- `WORKFLOW.md` — end-to-end workstation and OSC runbook (see the drift note above).
+- `NEXT_SESSION.md` — current handoff, open questions, and proposed fixes.
 
 ## Author
 

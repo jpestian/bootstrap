@@ -2,81 +2,90 @@
 title: bootstrap
 tags:
   - infrastructure
-  - workstation
-  - research-ops
-  - conda
   - reproducibility
-updated: 2026-07-10
+  - conda
+  - nlp
+  - hpc
+  - pestian-lab
+updated: 2026-08-01
 ---
 
 # Bootstrap
 
-The one-command way to bring a fresh Linux box up to the shared research
-workstation baseline. `bootstrap.sh` builds the standard directory tree,
-installs core tooling + Miniconda, restores a Conda environment, sets up Git
-and SSH, and clones the working repos. Idempotent — re-running it is safe.
+The lab's environment baseline. One sourced script gets any machine — a
+workstation or an [[OSC]] HPC account — to the same `nlp-core` Conda
+environment, so results move between machines without a dependency argument.
 
-> [!note] Purpose
-> Every research machine should end up **identical**: same directory layout,
-> same Python environment, same cloned projects, same dataset paths. This repo
-> is the source of truth for that baseline.
+Repo: `~/projects/bootstrap` · `git@github.com:jpestian/bootstrap.git`
 
-## Where it stands
+> [!note] The script is smaller than the docs suggest
+> `bootstrap.sh` is five steps and does exactly one job: create/update the
+> `nlp-core` Conda environment, activate it, and verify the imports. The
+> workstation provisioning narrative in [[Workflow]] — directory trees, GPU
+> detection, repo cloning — is a **manual checklist**, not automation. Read it
+> that way when planning a new machine build.
 
-Clean tree, in sync with `origin/main`. Nothing changed this session — the last
-substantive work is already committed:
+## What it actually does
 
-- **#repos** — `config/github_repos.txt` moved from HTTPS to SSH remotes and
-  grew to six: `bootstrap`, `nlp-core`, `ManifoldExperiments`, `litreview`,
-  `sacredtext`, `obsidian-vault`. (The last of these is this very
-  [[Obsidian]] vault.)
-- **#conda** — `config/nlp_core_environment.yml` re-exported with current
-  package pins (conda 26.1.1, Python 3.13.12).
+| Step | Action |
+|------|--------|
+| 1 | Load Conda — module system if present, local install otherwise |
+| 2 | Check `config/nlp-core.yml` exists |
+| 3 | `conda env create` / `conda env update --prune` for `nlp-core` |
+| 4 | `conda activate nlp-core` |
+| 5 | Import numpy, pandas, sklearn, transformers, sentence-transformers, umap, hdbscan, torch → print Torch + CUDA status |
 
-> [!warning] Loose ends to reconcile
-> - Env file says `name: base`, but `bootstrap.sh` still creates/activates
->   `nlp-core`. Pick one.
-> - The exported env is **base-only** — no numpy/torch/transformers pinned yet.
-> - `docs/WORKFLOW.md` still uses old names (`workstation-bootstrap` /
->   `setup_research_environment.sh`); current names are `bootstrap` /
->   `bootstrap.sh`.
+Idempotent. Re-running updates rather than recreates.
 
-## Mental model
+> [!warning] Source it, don't run it
+> `source bootstrap.sh` — `bash bootstrap.sh` puts the activation in a subshell
+> that dies on exit. And because the script sets `set -euo pipefail`, sourcing
+> it means a mid-script failure closes your terminal. Retry from a fresh shell.
 
-Three manifests plus a driver:
+## The environment
 
-- **Driver** — `bootstrap.sh`, twelve guarded steps.
-- **What to clone** — `config/github_repos.txt`.
-- **Python env** — `config/nlp_core_environment.yml`.
-- **System packages** — `config/installed_packages_apt.txt` (~2,300 entries;
-  a full `dpkg --get-selections` dump, not a curated list).
+`config/nlp-core.yml` is the single source of truth. Python 3.11, the standard
+scientific stack from conda-forge, and the ML layer from pip: `torch==2.5.1`,
+transformers, sentence-transformers, `umap-learn`, `hdbscan`.
 
-## The twelve steps at a glance
+> [!important] Torch is not GPU-aware here
+> `torch==2.5.1` is the plain PyPI pin. There is no CUDA-matched wheel
+> selection, contrary to [[Workflow]]. Step 5 *reports* CUDA availability —
+> it doesn't *arrange* for it. On a GPU box, verify before assuming acceleration.
 
-1. dirs → 2. PATH (`~/scripts`) → 3. core apt utils → 4. Miniconda →
-5. conda init → 6. restore env → 7. extra apt packages → 8. git config →
-9. ssh key → 10. clone repos → 11. machine profile (placeholder) →
-12. system summary.
+There is a second file, `config/nlp_core_environment.yml`, that nothing reads.
+It's an accidental export of a **base** env (`name: base`, Python 3.13, no ML
+libraries). Ignore it, or delete it — see [[Next Session]].
 
-> [!tip] Machine profiles
-> `bash bootstrap.sh {workstation|server|nas}` — currently just prints which
-> profile is active. Hook for future per-machine divergence.
+## Current state — #status/stable
 
-## Directory baseline
+Clean tree, synced with `origin/main`. This session removed `obsidian-vault`
+from `config/github_repos.txt`, taking the lab repo list to five: `bootstrap`,
+[[nlp-core]], [[ManifoldExperiments]], [[litreview]], [[sacredtext]].
 
-`~/projects` (git) · `~/research/{datasets,embeddings,models}` ·
-`~/artifacts/{manifolds,clustering,visualizations}` ·
-`~/containers/{defs,images,experiments}` · `~/notebooks` · `~/papers` ·
-`~/scripts` · `~/config` · `~/tmp`
+Worth knowing: `github_repos.txt` is a **manifest only** — no code reads it.
+Cloning is still by hand.
 
-## Related notes
+## Things a planner should know #drift
 
-- [[Workflow]] — full bare-metal runbook (USB → Ubuntu → bootstrap →
-  [[Syncthing]] sync).
-- [[Project Template]] — scaffold for a new research project.
-- [[nlp-core]] · [[ManifoldExperiments]] · [[litreview]] · [[sacredtext]]
+[[Workflow]] describes behavior the script doesn't have:
 
-> [!info] Planning prompt
-> Next time you touch this: fix the `base` vs `nlp-core` env-name split, decide
-> whether the ML libraries belong in the exported env or a separate one, and
-> refresh `docs/WORKFLOW.md` to the current repo/script names.
+- the `~/research` / `~/artifacts` / `~/containers` directory tree — not created
+- GPU detection via `nvidia-smi` — doesn't happen
+- a `MINICONDA_MODULE` override — doesn't exist; the module string
+  `miniconda3/24.1.2-py310` is hardcoded at line 33
+- repo cloning — not automated
+
+None of these break a run. They break expectations when someone follows the
+runbook on a new machine. When OSC upgrades their module, this becomes a real
+file edit rather than an env-var.
+
+## Related
+
+- [[Workflow]] — the bare-metal → running-machine runbook (see drift note)
+- [[Next Session]] — the handoff and the ordered fix list
+- [[OSC]] — Pitzer / Owens accounts
+- [[nlp-core]] — the environment's namesake project
+- [[Syncthing]] — how project dirs stay in sync between machines
+
+#pestian-lab #infrastructure #conda
