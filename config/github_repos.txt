@@ -3,4 +3,3 @@ git@github.com:jpestian/nlp-core.git
 git@github.com:jpestian/ManifoldExperiments.git
 git@github.com:jpestian/litreview.git
 git@github.com:jpestian/sacredtext.git
-git@github.com:jpestian/obsidian-vault.git
