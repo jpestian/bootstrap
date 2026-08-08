@@ -28,9 +28,21 @@ _bootstrap_main() {
   else
     echo "  [skip]  not an HPC node — using local conda"
   fi
-  local CONDA_BASE
-  CONDA_BASE="$(conda info --base 2>/dev/null)" || { echo "ERROR: conda not found"; return 1; }
-  [ -f "$CONDA_BASE/etc/profile.d/conda.sh" ] || { echo "ERROR: no conda.sh under $CONDA_BASE"; return 1; }
+  local CONDA_BASE=""
+  # conda may not be on PATH in a non-interactive shell; probe standard roots.
+  if command -v conda >/dev/null 2>&1; then
+    CONDA_BASE="$(conda info --base 2>/dev/null)"
+  fi
+  if [ -z "$CONDA_BASE" ] || [ ! -f "$CONDA_BASE/etc/profile.d/conda.sh" ]; then
+    local c
+    for c in "$HOME/miniconda3" "$HOME/anaconda3" "$HOME/miniforge3" \
+             "$HOME/mambaforge" /opt/conda /opt/miniconda3 /usr/local/miniconda3; do
+      if [ -f "$c/etc/profile.d/conda.sh" ]; then CONDA_BASE="$c"; break; fi
+    done
+  fi
+  if [ -z "$CONDA_BASE" ] || [ ! -f "$CONDA_BASE/etc/profile.d/conda.sh" ]; then
+    echo "ERROR: conda not found (checked PATH and standard install roots)"; return 1
+  fi
   # shellcheck disable=SC1091
   source "$CONDA_BASE/etc/profile.d/conda.sh"
   echo "  [ok]    conda base: $CONDA_BASE"
