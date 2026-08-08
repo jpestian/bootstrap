@@ -10,6 +10,7 @@ _bootstrap_main() {
   local REPO_DIR ENV_FILE
   REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[1]:-$0}")" && pwd)"
   ENV_FILE="$REPO_DIR/config/nlp-core.yml"
+  local USE_FILE="$ENV_FILE"
   local DRY="${DRY_RUN:-0}" NO_PRUNE="${NO_PRUNE:-1}"
 
   echo; echo "============================================="
@@ -48,7 +49,7 @@ _bootstrap_main() {
   echo "  [ok]    conda base: $CONDA_BASE"
 
   echo; echo "STEP 2 — Validate repository"
-  [ -f "$USE_FILE" ] || { echo "ERROR: missing $ENV_FILE"; return 1; }
+  [ -f "$ENV_FILE" ] || { echo "ERROR: missing $ENV_FILE"; return 1; }
   echo "  [ok]    $ENV_FILE"
 
   echo; echo "STEP 2b — GPU / torch policy"
@@ -65,7 +66,7 @@ _bootstrap_main() {
   else
     echo "  [ok]    no GPU - torch comes from the spec (CPU build)"
   fi
-  local USE_FILE="$ENV_FILE"
+  USE_FILE="$ENV_FILE"
   if [ "$SKIP_TORCH" = 1 ]; then
     USE_FILE="$(mktemp /tmp/nlp-core-notorch.XXXXXX)"
     grep -vE '^[[:space:]]*-[[:space:]]*torch([<>=!]|$)' "$ENV_FILE" > "$USE_FILE"
