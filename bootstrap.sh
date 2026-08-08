@@ -48,21 +48,42 @@ _bootstrap_main() {
   echo "  [ok]    conda base: $CONDA_BASE"
 
   echo; echo "STEP 2 — Validate repository"
-  [ -f "$ENV_FILE" ] || { echo "ERROR: missing $ENV_FILE"; return 1; }
+  [ -f "$USE_FILE" ] || { echo "ERROR: missing $ENV_FILE"; return 1; }
   echo "  [ok]    $ENV_FILE"
+
+  echo; echo "STEP 2b — GPU / torch policy"
+  local SKIP_TORCH=0
+  if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
+    echo "  GPU host: $(nvidia-smi --query-gpu=name --format=csv,noheader | paste -sd', ')"
+    if conda run -n "$ENV_NAME" python -c 'import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)' 2>/dev/null; then
+      echo "  [skip]  working CUDA torch present ($(conda run -n "$ENV_NAME" python -c 'import torch;print(torch.__version__)' 2>/dev/null)) - will NOT touch torch"
+    else
+      echo "  [WARN]  GPU present but no working CUDA torch. Bootstrap will NOT install one."
+      echo "          Install a build matching your driver by hand."
+    fi
+    SKIP_TORCH=1
+  else
+    echo "  [ok]    no GPU - torch comes from the spec (CPU build)"
+  fi
+  local USE_FILE="$ENV_FILE"
+  if [ "$SKIP_TORCH" = 1 ]; then
+    USE_FILE="$(mktemp /tmp/nlp-core-notorch.XXXXXX)"
+    grep -vE '^[[:space:]]*-[[:space:]]*torch([<>=!]|$)' "$ENV_FILE" > "$USE_FILE"
+    echo "  [info]  using torch-free spec: $USE_FILE"
+  fi
 
   echo; echo "STEP 3 — Environment setup"
   if conda env list | awk '{print $1}' | grep -qx "$ENV_NAME"; then
     if [ "$NO_PRUNE" = 1 ]; then
       echo "  [made]  updating $ENV_NAME (no --prune; hand-installed packages kept)"
-      [ "$DRY" = 1 ] || conda env update -n "$ENV_NAME" -f "$ENV_FILE"
+      [ "$DRY" = 1 ] || conda env update -n "$ENV_NAME" -f "$USE_FILE"
     else
       echo "  [WARN]  updating $ENV_NAME WITH --prune — packages not in spec will be REMOVED"
-      [ "$DRY" = 1 ] || conda env update -n "$ENV_NAME" -f "$ENV_FILE" --prune
+      [ "$DRY" = 1 ] || conda env update -n "$ENV_NAME" -f "$USE_FILE" --prune
     fi
   else
     echo "  [made]  creating $ENV_NAME"
-    [ "$DRY" = 1 ] || conda env create -f "$ENV_FILE"
+    [ "$DRY" = 1 ] || conda env create -f "$USE_FILE"
   fi
 
   echo; echo "STEP 4 — Verify (in $ENV_NAME)"
