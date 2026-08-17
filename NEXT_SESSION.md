@@ -2,92 +2,76 @@
 
 ## State
 
-Working tree **clean**, in sync with `origin/main`. HEAD is `1aea36d`
-("Remove obsidian-vault from bootstrap repositories", 2026-08-01 11:23), which
-dropped one line from `config/github_repos.txt` — the list is now five repos:
-`bootstrap`, `nlp-core`, `ManifoldExperiments`, `litreview`, `sacredtext`.
+Working tree **clean**, in sync with `origin/main`.
 
-Everything else this session was documentation. `README.md`,
-`README.obsidian.md`, and this file were regenerated; no source or config was
-touched.
+**This session rewrote `bootstrap.sh`** across four commits:
 
-**Correction carried forward:** the previous `README.md` and `NEXT_SESSION.md`
-described a repository that no longer exists — a twelve-step `bootstrap.sh`, a
-`docs/` directory, `project_template/`, and
-`config/installed_packages_apt.txt`. None of those are present. The tree was
-restructured to the lab scaffold in commit `1487ee8`, and the docs were never
-caught up; several doc-only sessions since then propagated the stale
-description. The regenerated docs are written against the actual current files.
-Prior handoff items about a `name: base` / `nlp-core` mismatch breaking the env
-step were based on that stale reading — see item 1 below for what the real
-situation is.
+- `30dd334` — idempotent rewrite: no exit-on-source (work fenced in a subshell),
+  `--prune` opt-in via `NO_PRUNE`, HPC-gated module load, `DRY_RUN` mode.
+- `b3d7073` — discover conda from standard install roots when not on `PATH`.
+- `b1e09d6` — loosen torch pin to `>=2.5`; skip torch on GPU hosts to protect
+  tuned CUDA builds.
+- `1c3831d` — fix `USE_FILE` unbound in STEP 2; declare it early.
+
+Net effect: the script is now genuinely idempotent and safe to source. Several
+long-standing doc complaints are **resolved by code** this session — the
+`MINICONDA_MODULE` override now exists (`bootstrap.sh:28`), GPU detection now
+happens (STEP 2b), and the `set -euo pipefail`-closes-your-terminal hazard is
+gone because provisioning runs in a subshell. The README and Obsidian note were
+regenerated against the current script.
 
 Nothing is blocked.
 
 ## Next steps (ordered)
 
-1. **Delete or rename `config/nlp_core_environment.yml`.** It is an accidental
-   `conda env export` of a *base* environment: `name: base`, Python 3.13.12,
-   conda/anaconda toolchain only, no ML libraries. Nothing reads it —
-   `bootstrap.sh` line 10 points at `config/nlp-core.yml`. Its only effect is
-   to make readers think it's the real spec (it misled the last several
-   sessions of documentation). Removing it is a one-line change with no
-   runtime risk. Highest value for the effort.
+1. **Reconcile `WORKFLOW.md` with the rewritten script.** Two claims that were
+   previously wrong are now correct (`MINICONDA_MODULE`, GPU detection) — verify
+   the runbook's wording matches. Two still describe automation that does not
+   exist:
+   - The `~/research` / `~/artifacts` / `~/containers` / `~/notebooks` / … home
+     directory tree — not created by the script.
+   - Cloning repos from `config/github_repos.txt` — not automated.
 
-2. **Reconcile `WORKFLOW.md` with the script.** Four claims in the runbook
-   describe automation that doesn't exist:
-   - §8 — the `~/research`, `~/artifacts`, `~/containers`, `~/notebooks`,
-     `~/papers`, `~/scripts`, `~/config`, `~/tmp` tree. Not created.
-   - §7 / §17.4 — "detects GPU via `nvidia-smi` and installs the correct
-     PyTorch build." Doesn't happen; `torch==2.5.1` is a fixed PyPI pin.
-   - §17.4 — `MINICONDA_MODULE=… source bootstrap.sh`. No such variable; the
-     module string is hardcoded at `bootstrap.sh:33`.
-   - Repo cloning from `config/github_repos.txt`. Not automated.
+   Decide per item: **implement** in the script, or **reword** the runbook as a
+   manual checklist. Rewording is cheaper and probably right for both.
 
-   Decide per item whether to **implement** it in the script or **reword** the
-   runbook as a manual checklist. Rewording is cheaper and probably right for
-   the directory tree and cloning; the `MINICONDA_MODULE` override is worth
-   actually implementing (see item 3).
+2. **Delete or rename `config/nlp_core_environment.yml`.** It's an accidental
+   `conda env export` of a *base* environment (`name: base`, conda/anaconda
+   toolchain only, no ML libraries). Nothing reads it — `bootstrap.sh` points at
+   `config/nlp-core.yml`. Its only effect is to mislead readers into thinking
+   it's the real spec. One-line removal, no runtime risk.
 
-3. **Add the `MINICONDA_MODULE` override.** One line at `bootstrap.sh:33`:
-   `module load "${MINICONDA_MODULE:-miniconda3/24.1.2-py310}"`. OSC rotates
-   module versions, and today a rotation means editing and committing the
-   script on every machine. This makes §17.4 true as written.
+3. **Decide the GPU-torch story and document it.** The script now *protects* an
+   existing CUDA torch on a GPU host and installs nothing when one is missing —
+   it does not build a CUDA-matched wheel. If the lab wants bootstrap to install
+   GPU torch, the spec needs a CUDA index URL / `pytorch-cuda` dependency and
+   STEP 2b needs an install branch. If "protect, don't install" is the intended
+   policy, state that in `config/nlp-core.yml` and `WORKFLOW.md` so nobody
+   expects auto-install. This is the one open question with a correctness
+   consequence.
 
-4. **Decide on GPU-aware Torch.** If lab or OSC GPU work is expected, the pip
-   pin needs a CUDA index URL (or a conda-forge `pytorch-cuda` dependency)
-   rather than the default wheel. If CPU-only is the intent, say so explicitly
-   in `config/nlp-core.yml` so nobody has to infer it. Requires a decision
-   before it can be implemented — see open questions.
-
-5. **Clean up the strays.** `.push_test` (two lines of auto-push test output
-   from 2026-07-09) and `scripts/files.zip` (2.6 KB, unreferenced, provenance
+4. **Clean up the strays.** `.push_test` (94 bytes, auto-push test leftover from
+   2026-07-09) and `scripts/files.zip` (2.6 KB, unreferenced, provenance
    unknown — inspect before deleting).
+
+5. **Decide `config/github_repos.txt`'s role.** A well-maintained five-repo
+   manifest that no code reads. Either wire it into `bootstrap.sh` as a clone
+   step or document it explicitly as a human reference list.
 
 ## Open questions / risks
 
-- **Is GPU acceleration expected from this environment?** The verify step
-  prints CUDA availability, which reads as though CUDA is being provisioned,
-  but nothing installs for it. Someone could run GPU work on a CPU wheel and
-  only notice via wall-clock. This is the one open question with a real
-  correctness consequence.
-- **Is `config/github_repos.txt` aspirational or vestigial?** It's a
-  well-maintained manifest — updated as recently as this session — that no code
-  reads. Either wire it into `bootstrap.sh` as a clone step or document it as a
-  human reference list.
-- **What is `scripts/files.zip`?** Not referenced anywhere. Unknown whether it
-  matters.
-- **`set -euo pipefail` in a sourced script.** The script must be sourced for
-  `conda activate` to persist, but that means the strict-mode options apply to
-  the interactive shell and any failure closes the user's terminal. Works fine
-  on the happy path; hostile when something breaks. Consider a trap or a
-  wrapper function.
-- **No tests.** `bash -n bootstrap.sh` catches syntax only. Real verification
-  is running it on a clean machine, which is slow and not something CI does.
-- **Docs drift is the recurring failure mode here.** The stale README survived
-  several sessions because each doc pass regenerated from the previous doc
-  rather than from the tree. Read `bootstrap.sh` and `ls config/` first next
-  time.
+- **Is GPU torch expected to be provisioned, or only protected?** See step 3 —
+  the current behavior is "leave a working CUDA build alone, never install one."
+  If someone expects `source bootstrap.sh` to give them GPU acceleration, they
+  will get a CPU wheel (CPU host) or a warning (GPU host without CUDA torch),
+  not an install.
+- **No tests.** `bash -n bootstrap.sh` catches syntax only; `DRY_RUN=1` exercises
+  the control flow without changing anything. Real verification is a clean-machine
+  run, which is slow and not in CI.
+- **`config/nlp_core_environment.yml`** keeps confusing doc passes — remove it to
+  end the recurring drift.
+- **Docs drift is the recurring failure mode.** Read `bootstrap.sh` and
+  `ls config/` before trusting any doc — the script changes faster than the prose.
 
 ## Context pointers
 
@@ -95,7 +79,7 @@ Nothing is blocked.
 cd ~/projects/bootstrap
 
 # the script — read this before trusting any doc
-cat bootstrap.sh              # 5 STEP blocks; env file at line 10, module at 33
+cat bootstrap.sh              # _bootstrap_main(): STEP 1, 2, 2b, 3, 4; module override at line 28
 
 # what's actually here
 ls config/ scripts/           # nlp-core.yml is the real spec
@@ -103,18 +87,19 @@ cat config/nlp-core.yml
 
 # checks
 bash -n bootstrap.sh          # syntax only
-source bootstrap.sh           # full run; STEP 5 verifies imports
+DRY_RUN=1 source bootstrap.sh # dry run — plan, no changes
+source bootstrap.sh           # full run; STEP 4 verifies imports
 conda env list                # nlp-core present + active?
 
 # history
-git log --oneline -10
-git show 1487ee8 --stat       # the restructure the old docs missed
+git log --oneline -8
+git show 30dd334 --stat       # this session's idempotent rewrite
 ```
 
 - Environment spec: `config/nlp-core.yml` — Python 3.11, conda-forge scientific
-  stack, pip `torch==2.5.1` / transformers / sentence-transformers /
-  umap-learn / hdbscan / tqdm.
-- Runbook: `WORKFLOW.md` at repo root (not `docs/`) — accurate for the manual
-  Ubuntu/Syncthing/OSC steps, inaccurate about the script. See step 2.
+  stack, pip `torch>=2.5` / `transformers>=4.40` / `sentence-transformers>=2.6`
+  / `umap-learn` / `hdbscan` / `tqdm`.
+- Runbook: `WORKFLOW.md` at repo root — accurate for the manual Ubuntu/Syncthing/
+  OSC steps; reconcile the directory-tree and cloning language (step 1).
 - Regenerate the env export, if it is kept:
   `conda env export --no-builds -n nlp-core > config/nlp_core_environment.yml`
